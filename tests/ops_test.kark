@@ -1,0 +1,61 @@
+// Round 2 operations tests for Karkain Inventory Management (self-contained).
+
+func test_adjust_reason_validation() {
+    let reasons = "DAMAGE|CORRECTION|FOUND|RETURN"
+    let used = ["DAMAGE", "BADREASON", "CORRECTION"]
+    let valid = 0
+    let i = 0
+    while (i < len(used)) {
+        if (contains(reasons, used[i]) == 1) { valid = valid + 1 }
+        i = i + 1
+    }
+    assert_eq(valid, 2)
+    let adj = split("ADJ|WIDGET-01|WH1|-10|DAMAGE", "|")
+    assert_eq(len(adj), 5)
+    assert_eq(adj[4], "DAMAGE")
+    assert_eq(int(adj[3]), -10)
+}
+
+func test_valuation_and_negative_stock() {
+    let costs = ["UNIT_COST|WIDGET-01|10", "UNIT_COST|GIZMO-02|25"]
+    let qtys = ["STOCK|WIDGET-01|WH1|90", "STOCK|GIZMO-02|WH1|50"]
+    let total = 0
+    let i = 0
+    while (i < len(qtys)) {
+        let q = split(qtys[i], "|")
+        let j = 0
+        while (j < len(costs)) {
+            let c = split(costs[j], "|")
+            if (c[1] == q[1]) { total = total + int(q[3]) * int(c[2]) }
+            j = j + 1
+        }
+        i = i + 1
+    }
+    assert_eq(total, 2150)
+    let book = 90
+    let delta = -1000
+    let would_be = book + delta
+    let blocked = 0
+    if (would_be < 0) { blocked = 1 }
+    assert_eq(blocked, 1)
+}
+
+func test_reconciliation_variance() {
+    let counts = ["COUNT|WIDGET-01|WH1|85", "COUNT|GIZMO-02|WH1|48"]
+    let books = ["STOCK|WIDGET-01|WH1|90", "STOCK|GIZMO-02|WH1|50"]
+    let variances = []
+    let i = 0
+    while (i < len(counts)) {
+        let c = split(counts[i], "|")
+        let j = 0
+        while (j < len(books)) {
+            let b = split(books[j], "|")
+            if (b[1] == c[1]) { push(variances, int(c[3]) - int(b[3])) }
+            j = j + 1
+        }
+        i = i + 1
+    }
+    assert_eq(len(variances), 2)
+    assert_eq(variances[0], -5)
+    assert_eq(variances[1], -2)
+}

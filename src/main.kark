@@ -1,6 +1,7 @@
 // Karkain Inventory Management - first functional slice.
 // SKU master data, stock receipts/issues, count verification and reporting.
 // Builtins only; all paths are relative to the repo root.
+import inv_adjust
 
 func find_sku(state, code) {
     let i = 0
@@ -243,4 +244,5 @@ func main() {
         j = j + 1
     }
     print("INVENTORY_OK skus=" + str(count_kind(state, "SKU")) + " locations=" + str(count_kind(state, "STOCK")) + " total_units=" + str(total))
+    inv_adjust.inv2_run()
 }
