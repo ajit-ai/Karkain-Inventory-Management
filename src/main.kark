@@ -1,0 +1,246 @@
+// Karkain Inventory Management - first functional slice.
+// SKU master data, stock receipts/issues, count verification and reporting.
+// Builtins only; all paths are relative to the repo root.
+
+func find_sku(state, code) {
+    let i = 0
+    while (i < len(state)) {
+        let f = split(state[i], "|")
+        if (f[0] == "SKU") {
+            if (f[1] == code) { return state[i] }
+        }
+        i = i + 1
+    }
+    return ""
+}
+
+func upsert_sku(state, code, name) {
+    let rec = "SKU|" + code + "|" + name
+    let out = []
+    let i = 0
+    let replaced = 0
+    while (i < len(state)) {
+        let f = split(state[i], "|")
+        if (f[0] == "SKU") {
+            if (f[1] == code) { push(out, rec); replaced = 1 }
+            else { push(out, state[i]) }
+        } else { push(out, state[i]) }
+        i = i + 1
+    }
+    if (replaced == 0) { push(out, rec) }
+    return out
+}
+
+func count_kind(state, kind) {
+    let n = 0
+    let i = 0
+    while (i < len(state)) {
+        let f = split(state[i], "|")
+        if (f[0] == kind) { n = n + 1 }
+        i = i + 1
+    }
+    return n
+}
+
+func append_rec(state, rec) {
+    let out = []
+    let i = 0
+    while (i < len(state)) { push(out, state[i]); i = i + 1 }
+    push(out, rec)
+    return out
+}
+
+func find_stock(state, code, wh) {
+    let i = 0
+    while (i < len(state)) {
+        let f = split(state[i], "|")
+        if (f[0] == "STOCK") {
+            if (f[1] == code) {
+                if (f[2] == wh) { return state[i] }
+            }
+        }
+        i = i + 1
+    }
+    return ""
+}
+
+func qty_of(state, code, wh) {
+    let rec = find_stock(state, code, wh)
+    if (rec == "") { return 0 }
+    let f = split(rec, "|")
+    return int(f[3])
+}
+
+func set_stock(state, code, wh, qty) {
+    let rec = "STOCK|" + code + "|" + wh + "|" + str(qty)
+    let out = []
+    let i = 0
+    let replaced = 0
+    while (i < len(state)) {
+        let f = split(state[i], "|")
+        if (f[0] == "STOCK") {
+            if (f[1] == code) {
+                if (f[2] == wh) { push(out, rec); replaced = 1 }
+                else { push(out, state[i]) }
+            } else { push(out, state[i]) }
+        } else { push(out, state[i]) }
+        i = i + 1
+    }
+    if (replaced == 0) { push(out, rec) }
+    return out
+}
+
+func has_event(state, kind, code, qty, wh) {
+    let q = str(qty)
+    let i = 0
+    while (i < len(state)) {
+        let f = split(state[i], "|")
+        if (f[0] == "EVENT") {
+            if (f[1] == kind) {
+                if (f[2] == code) {
+                    if (f[3] == q) {
+                        if (f[4] == wh) { return 1 }
+                    }
+                }
+            }
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+func stock_receive(state, code, qty, wh) {
+    if (find_sku(state, code) == "") {
+        print("RECEIVE " + code + " FAIL unknown_sku")
+        return state
+    }
+    if (qty < 1) {
+        print("RECEIVE " + code + " FAIL bad_qty")
+        return state
+    }
+    let cur = qty_of(state, code, wh)
+    if (has_event(state, "RECEIVE", code, qty, wh) == 1) {
+        print("RECEIVE " + code + " " + str(qty) + " " + wh + " -> " + str(cur) + " already")
+        return state
+    }
+    cur = cur + qty
+    state = set_stock(state, code, wh, cur)
+    state = append_rec(state, "EVENT|RECEIVE|" + code + "|" + str(qty) + "|" + wh)
+    print("RECEIVE " + code + " " + str(qty) + " " + wh + " -> " + str(cur))
+    return state
+}
+
+func stock_issue(state, code, qty, wh) {
+    if (find_sku(state, code) == "") {
+        print("ISSUE " + code + " FAIL unknown_sku")
+        return state
+    }
+    if (qty < 1) {
+        print("ISSUE " + code + " FAIL bad_qty")
+        return state
+    }
+    let cur = qty_of(state, code, wh)
+    if (has_event(state, "ISSUE", code, qty, wh) == 1) {
+        print("ISSUE " + code + " " + str(qty) + " " + wh + " -> " + str(cur) + " already")
+        return state
+    }
+    if (cur < qty) {
+        print("ISSUE " + code + " FAIL insufficient_stock have=" + str(cur) + " need=" + str(qty))
+        return state
+    }
+    cur = cur - qty
+    state = set_stock(state, code, wh, cur)
+    state = append_rec(state, "EVENT|ISSUE|" + code + "|" + str(qty) + "|" + wh)
+    print("ISSUE " + code + " " + str(qty) + " " + wh + " -> " + str(cur))
+    return state
+}
+
+func stock_count(state, code, wh) {
+    let q = qty_of(state, code, wh)
+    print("COUNT " + code + " " + wh + " qty=" + str(q))
+    return q
+}
+
+func print_report(state) {
+    let total = 0
+    let locations = 0
+    let i = 0
+    while (i < len(state)) {
+        let f = split(state[i], "|")
+        if (f[0] == "STOCK") {
+            locations = locations + 1
+            total = total + int(f[3])
+            print("STOCK " + f[1] + " " + f[2] + " qty=" + f[3])
+        }
+        i = i + 1
+    }
+    print("REPORT skus=" + str(count_kind(state, "SKU")) + " locations=" + str(locations) + " total_units=" + str(total))
+    return total
+}
+
+func persist(path, state) {
+    let out = ""
+    let i = 0
+    while (i < len(state)) { out = out + state[i] + "\n"; i = i + 1 }
+    writeFile(path, out)
+}
+
+func main() {
+    let cmd_path = "data/commands.dat"
+    let state_path = "data/state.dat"
+    let report_path = "data/report.dat"
+    let txt = readFile(cmd_path)
+    let cmds = split(txt, "\n")
+    let state = split(readFile(state_path), "\n")
+    let report = ""
+    let i = 0
+    while (i < len(cmds)) {
+        let line = trim(cmds[i])
+        if (line != "") {
+            let f = split(line, "|")
+            let op = trim(f[0])
+            if (op == "SKU") {
+                let code = trim(f[1])
+                let name = trim(f[2])
+                state = upsert_sku(state, code, name)
+                report = report + "SKU " + code + " " + name + "\n"
+                print("SKU " + code + " " + name)
+            }
+            if (op == "RECEIVE") {
+                let code = trim(f[1])
+                let qty = int(trim(f[2]))
+                let wh = trim(f[3])
+                state = stock_receive(state, code, qty, wh)
+                report = report + "RECEIVE " + code + " " + str(qty) + " " + wh + "\n"
+            }
+            if (op == "ISSUE") {
+                let code = trim(f[1])
+                let qty = int(trim(f[2]))
+                let wh = trim(f[3])
+                state = stock_issue(state, code, qty, wh)
+                report = report + "ISSUE " + code + " " + str(qty) + " " + wh + "\n"
+            }
+            if (op == "COUNT") {
+                let code = trim(f[1])
+                let wh = trim(f[2])
+                stock_count(state, code, wh)
+                report = report + "COUNT " + code + " " + wh + "\n"
+            }
+            if (op == "REPORT") {
+                print_report(state)
+                report = report + "REPORT\n"
+            }
+        }
+        i = i + 1
+    }
+    persist(state_path, state)
+    persist(report_path, split(report, "\n"))
+    let total = 0
+    let j = 0
+    while (j < len(state)) {
+        let g = split(state[j], "|")
+        if (g[0] == "STOCK") { total = total + int(g[3]) }
+        j = j + 1
+    }
+    print("INVENTORY_OK skus=" + str(count_kind(state, "SKU")) + " locations=" + str(count_kind(state, "STOCK")) + " total_units=" + str(total))
+}

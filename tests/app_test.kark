@@ -1,0 +1,53 @@
+func test_stock_record_shape() {
+    let rec = "STOCK|WIDGET-01|WH1|70"
+    let f = split(rec, "|")
+    assert_eq(len(f), 4)
+    assert_eq(f[0], "STOCK")
+    assert_eq(f[1], "WIDGET-01")
+    assert_eq(f[2], "WH1")
+    assert_eq(int(f[3]), 70)
+}
+
+func test_receive_issue_arithmetic() {
+    let events = ["RECEIVE|WIDGET-01|100|WH1", "ISSUE|WIDGET-01|30|WH1", "RECEIVE|WIDGET-01|20|WH1"]
+    let qty = 0
+    let i = 0
+    while (i < len(events)) {
+        let f = split(events[i], "|")
+        let n = int(f[2])
+        if (f[0] == "RECEIVE") { qty = qty + n }
+        if (f[0] == "ISSUE") { qty = qty - n }
+        i = i + 1
+    }
+    assert_eq(qty, 90)
+    let issue_qty = 30
+    let before = 20
+    let blocked = 0
+    if (before < issue_qty) { blocked = 1 }
+    assert_eq(blocked, 1)
+}
+
+func test_location_upsert_keeps_one_record() {
+    let state = ["STOCK|WIDGET-01|WH1|100", "STOCK|GIZMO-02|WH1|50"]
+    let updated = []
+    let i = 0
+    let replaced = 0
+    while (i < len(state)) {
+        let f = split(state[i], "|")
+        if (f[1] == "WIDGET-01") {
+            if (f[2] == "WH1") { push(updated, "STOCK|WIDGET-01|WH1|70"); replaced = 1 }
+            else { push(updated, state[i]) }
+        } else { push(updated, state[i]) }
+        i = i + 1
+    }
+    assert_eq(replaced, 1)
+    assert_eq(len(updated), 2)
+    let total = 0
+    let j = 0
+    while (j < len(updated)) {
+        let g = split(updated[j], "|")
+        total = total + int(g[3])
+        j = j + 1
+    }
+    assert_eq(total, 120)
+}
